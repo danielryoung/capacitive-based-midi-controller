@@ -18,7 +18,8 @@ BSD license, all text above must be included in any redistribution
 //sketch in progress.  trying to read i2c from mpr121 and send midi message from teensy in response to which pin is touched. 
 //important links: teensy wire library: https://www.pjrc.com/teensy/td_libs_Wire.html
 // teensy midi library: https://www.pjrc.com/teensy/td_midi.html
-//current issues: doesn't work once unplugged and plugged back in.  only works when connedted to the serial monitor
+
+
 
 #include <Wire.h>
 #include "Adafruit_MPR121.h"
