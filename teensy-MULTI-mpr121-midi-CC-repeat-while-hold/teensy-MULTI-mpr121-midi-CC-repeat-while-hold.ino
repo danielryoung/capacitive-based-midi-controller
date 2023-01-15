@@ -23,6 +23,7 @@ BSD license, all text above must be included in any redistribution
 #include <Wire.h>
 #include "Adafruit_MPR121.h"
 #include <Ticker.h>
+#include <FastLED.h>
 
 #ifndef _BV
 #define _BV(bit) (1 << (bit)) 
@@ -31,11 +32,36 @@ BSD license, all text above must be included in any redistribution
 //This is the duration between sends of midi signal in Milliseconds.
 #define TRIGGER_DURATION 100
 
+// LED Stuff
+
+#define DATA_PIN    3
+#define LED_TYPE    WS2812
+#define COLOR_ORDER GRB
+#define NUM_LEDS    64
+CRGB leds[NUM_LEDS];
+
+#define BRIGHTNESS          96
+#define FRAMES_PER_SECOND  120
+bool ambient_leds = true;
+bool trigger_leds = false;
+
+uint8_t gHue = 0; // rotating "base color" used by many of the patterns from Demo Reel 100 example
+
+ 
+
 void triggerLoop(); // hoisted, defined below.
+void ledFrameLoop();
+void startAmbient();
+
+#define LED_DECAY 5000 // leds will decay in brightness for 5 seconds before going dark
+#define AMBIENT_DELAY 10000 // leds will start doing something after the keys are untouched for this duration.
 
 // Ticker Library sets up timers and a function to call when the timer elapses
            //(functioncalled, timertime, number to repeat(0is forever, RESOLUTION)
 Ticker repeatTimer(triggerLoop, TRIGGER_DURATION, 0, MILLIS);
+
+Ticker ledFrameTimer(ledFrameLoop, FRAMES_PER_SECOND, 0, MILLIS);
+Ticker ambientLEDs(startAmbient, AMBIENT_DELAY, 0 , Ticker.MILLIS);
 // You can have up to 4 on one i2c bus but one is enough for testing!
 Adafruit_MPR121 capA = Adafruit_MPR121();
 Adafruit_MPR121 capB = Adafruit_MPR121();
@@ -58,6 +84,8 @@ uint8_t ElectrodeTouchedA[numElectrodes] = {0,0,0,0,0,0,0,0,0,0,0,0};
 uint8_t ElectrodeTouchedB[numElectrodes] = {0,0,0,0,0,0,0,0,0,0,0,0};
 
 int channel = 1; //added by drc // channel 0 was returning channel 16 in midi monitor
+
+ 
 
 
 void setup() {
@@ -87,6 +115,14 @@ void setup() {
   Serial.println("MPR121 0x5B found!");
   
   repeatTimer.start();
+  ledFrameTimer.start();
+
+    // tell FastLED about the LED strip configuration
+  FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+  // set master brightness control
+  FastLED.setBrightness(BRIGHTNESS);
+
+  
 }
 
 void loop() {
@@ -94,7 +130,15 @@ void loop() {
   currtouchedA = capA.touched();
   currtouchedB = capB.touched();
 
+  // key repeat timer
   repeatTimer.update();
+
+  // led frame render timer
+  ledFrameTimer.update();
+
+  // turn on ambient LEDs timer
+  ambientLEDs.update();
+  
   // timer is runnig as long as this is getting called.
 
   checkElectrodes();
@@ -119,6 +163,7 @@ void checkElectrodes(){
 
       digitalWrite (LED_BUILTIN, LOW);
       Serial.print(i); Serial.println(" released of A");
+      
       // set it back to 0 on release
       ElectrodeTouchedA[i] = 0;   
     }
@@ -135,6 +180,11 @@ void checkElectrodes(){
       Serial.print(i); Serial.println(" touched of B");
       // set the array value to 1 on touch
       ElectrodeTouchedB[i] = 1;
+
+      // on touch, turn off ambient leds and turn on trigger_leds
+      ambient_leds = false;
+      trigger_leds = true;
+      
     }
     // if it *was* touched and now *isnt*, alert! 
     if (!(currtouchedB & _BV(i)) && (lasttouchedB & _BV(i)) ) {
@@ -143,6 +193,9 @@ void checkElectrodes(){
       Serial.print(i); Serial.println(" released of B");
       // set it back to 0 on release
       ElectrodeTouchedB[i] = 0;   
+      // start the ambient timer after release
+      // this will start counting from release and fire after AMBIENT_DELAY
+      ledFrameTimer.start();
     }
   }
 
@@ -156,6 +209,7 @@ void triggerLoop(){
   // this fires on a timer and anything pressed triggers midi
   for (uint8_t i=0; i<numElectrodes; i++) { 
     if (ElectrodeTouchedA[i]) {
+      startLeds = true;
       triggerMidiA(i);
     }
      if (ElectrodeTouchedB[i]) {
@@ -166,6 +220,49 @@ void triggerLoop(){
   //Serial.print("trigger Loop");
 
 }
+
+void startAmbient(){
+  // this fires after the ambient timer has elapsed.
+  // it will start the leds doing the ambient pattern until set to false.
+  
+  ambient_leds = true;
+}
+
+void ledFrameLoop(){
+
+  // calls bpm from DEMO REEL 100
+  // This is a single 'frame' of leds for the whole strip.
+  // it gets called based on the timer to set framerate
+  // any function that writes a full strip worth of colors will work.
+
+  gHue++;
+  if (trigger_leds == true) {
+    bpm();
+  }
+  elif (ambient_leds == true && trigger_leds == false) {
+    rainbow();
+  }
+  
+}
+
+void bpm()
+{
+  // colored stripes pulsing at a defined Beats-Per-Minute (BPM)
+  uint8_t BeatsPerMinute = 62;
+  CRGBPalette16 palette = PartyColors_p;
+  uint8_t beat = beatsin8( BeatsPerMinute, 64, 255);
+  for( int i = 0; i < NUM_LEDS; i++) { //9948
+    leds[i] = ColorFromPalette(palette, gHue+(i*2), beat-gHue+(i*10));
+  }
+}
+
+void rainbow() 
+{
+  // FastLED's built-in rainbow generator
+  fill_rainbow( leds, NUM_LEDS, gHue, 7);
+}
+
+
 
 void triggerMidiA(int i){
    usbMIDI.sendControlChange(controlNumA[i], controlValA[i], channel); //(control#, controlval, channel)
