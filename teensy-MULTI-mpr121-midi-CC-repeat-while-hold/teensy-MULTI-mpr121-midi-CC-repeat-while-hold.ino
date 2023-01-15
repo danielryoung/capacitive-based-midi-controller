@@ -60,7 +60,7 @@ void startAmbient();
            //(functioncalled, timertime, number to repeat(0is forever, RESOLUTION)
 Ticker repeatTimer(triggerLoop, TRIGGER_DURATION, 0, MILLIS);
 
-Ticker ledFrameTimer(ledFrameLoop, FRAMES_PER_SECOND, 0, MILLIS);
+Ticker ledFrameTimer(ledFrameLoop, 1000/FRAMES_PER_SECOND, 0, MILLIS);
 Ticker ambientLEDs(startAmbient, AMBIENT_DELAY, 0 , Ticker.MILLIS);
 // You can have up to 4 on one i2c bus but one is enough for testing!
 Adafruit_MPR121 capA = Adafruit_MPR121();
@@ -138,6 +138,7 @@ void loop() {
 
   // turn on ambient LEDs timer
   ambientLEDs.update();
+  FastLED.show(); 
   
   // timer is runnig as long as this is getting called.
 
@@ -195,7 +196,7 @@ void checkElectrodes(){
       ElectrodeTouchedB[i] = 0;   
       // start the ambient timer after release
       // this will start counting from release and fire after AMBIENT_DELAY
-      ledFrameTimer.start();
+      ambientLEDs.start();
     }
   }
 
@@ -209,7 +210,7 @@ void triggerLoop(){
   // this fires on a timer and anything pressed triggers midi
   for (uint8_t i=0; i<numElectrodes; i++) { 
     if (ElectrodeTouchedA[i]) {
-      startLeds = true;
+
       triggerMidiA(i);
     }
      if (ElectrodeTouchedB[i]) {
@@ -239,7 +240,7 @@ void ledFrameLoop(){
   if (trigger_leds == true) {
     bpm();
   }
-  elif (ambient_leds == true && trigger_leds == false) {
+  else if (ambient_leds == true && trigger_leds == false) {
     rainbow();
   }
   
