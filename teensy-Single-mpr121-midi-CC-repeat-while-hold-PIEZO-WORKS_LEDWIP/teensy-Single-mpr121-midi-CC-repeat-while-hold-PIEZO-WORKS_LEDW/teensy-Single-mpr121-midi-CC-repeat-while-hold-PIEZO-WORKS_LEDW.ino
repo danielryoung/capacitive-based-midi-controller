@@ -73,7 +73,7 @@ void startAmbient();
 void stopPiezo();
 
 #define LED_DECAY 5000 // leds will decay in brightness for 5 seconds before going dark
-#define AMBIENT_DELAY 2000 // leds will start doing something after the keys are untouched for this duration.
+#define AMBIENT_DELAY 5000 // leds will start doing something after the keys are untouched for this duration.
 
 
 void triggerLoop(); // hoisted, defined below.
@@ -276,7 +276,7 @@ void ledFrameLoop(){
     // Serial.println("ambient mode");
   }
   else {
-    //fadeToBlackBy( leds, NUM_LEDS, 10);
+    fadeToBlackBy( leds, NUM_LEDS, 10);
   }
   
 }
