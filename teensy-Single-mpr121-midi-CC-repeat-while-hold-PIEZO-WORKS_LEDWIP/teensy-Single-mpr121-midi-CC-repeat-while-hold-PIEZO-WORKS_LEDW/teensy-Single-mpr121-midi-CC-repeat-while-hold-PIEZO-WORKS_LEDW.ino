@@ -27,8 +27,8 @@ const int numDrumPins = 6;
 const int drumNotes[] = {38,39,40,41,42,43};
 const int drumPins[] = {A0, A1, A2, A7, A8, A9};
 const int channel = 1;
-const int thresholdMin = 12;  // minimum reading, avoid "noise"
-const int aftershockMillis = 60; // time of aftershocks & vibration
+const int thresholdMin = 15;  // minimum reading, avoid "noise"
+const int aftershockMillis = 30; // time of aftershocks & vibration
 
 
 #include <Wire.h>
@@ -56,15 +56,15 @@ bool ambient_leds = true;
 bool trigger_leds = false;
 
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns from Demo Reel 100 example
-
+uint8_t gBright = 0;
  CRGBPalette16 custom_palette_1 = 
     { 0x000208, 0x00030E, 0x000514, 0x00061A, 0x000820, 0x000927, 0x000B2D, 0x000C33, 
       0x000E39, 0x001040, 0x001450, 0x001860, 0x001C70, 0x002080, 0x1040BF, 0x2060FF };
 
  CRGBPalette16 custom_palette_2 = 
     { 
-      CRGB::Black, CRGB::Maroon, CRGB::DarkBlue, CRGB::Blue, CRGB::Orange, CRGB::Maroon, CRGB::Maroon, CRGB::Maroon,
-      CRGB::Maroon, CRGB::Maroon, CRGB::Maroon, CRGB::Maroon, CRGB::Maroon, CRGB::Maroon ,CRGB::Maroon, CRGB::Maroon
+      CRGB::Yellow, CRGB::Purple, CRGB::DarkBlue, CRGB::Blue, CRGB::Orange, CRGB::Maroon, CRGB::Maroon, CRGB::Maroon,
+      CRGB::Maroon, CRGB::Black, CRGB::Maroon, CRGB::Black, CRGB::Purple, CRGB::Orange ,CRGB::Purple, CRGB::Maroon
     };
 
 void triggerLoop(); // hoisted, defined below.
@@ -73,7 +73,7 @@ void startAmbient();
 void stopPiezo();
 
 #define LED_DECAY 5000 // leds will decay in brightness for 5 seconds before going dark
-#define AMBIENT_DELAY 10000 // leds will start doing something after the keys are untouched for this duration.
+#define AMBIENT_DELAY 2000 // leds will start doing something after the keys are untouched for this duration.
 
 
 void triggerLoop(); // hoisted, defined below.
@@ -100,7 +100,7 @@ void setup() {
   
   
   Wire.begin(0x5A); //added by drc
-  Serial.begin(9600);
+  //Serial.begin(9600);
   pinMode(LED_BUILTIN, OUTPUT); //added by drc
   Wire.setSDA(18); //use a 4.7k pullup resistor //added by drc
   Wire.setSCL(19); //use a 4.7k pullup resistor //added by drc
@@ -130,10 +130,10 @@ void setup() {
 void loop() {
 
 //drum stuff
-while (usbMIDI.read()) { } // ignore incoming messages??
+//while (usbMIDI.read()) { } // ignore incoming messages??
   for (uint8_t x=0; x<numDrumPins; x++) { //changed i<0 to i<numElectrodes
     int value = analogRead(drumPins[x]);
-
+    //Serial.println(value);
     if (state[x] == 0) {
       // IDLE state: if any reading is above a threshold, begin peak
       if (value > thresholdMin) {
@@ -146,13 +146,14 @@ while (usbMIDI.read()) { } // ignore incoming messages??
       // Peak Tracking state: for 10 ms, capture largest reading
       if (value > peak[x]) {
         peak[x] = value;
+        Serial.println(peak[x]);
       }
       if (msec[x] >= 10) {
         Serial.print("peak = ");
         Serial.println(peak[x]);
         trigger_leds = true;
         ambient_leds = false;
-        PiezoEffect.interval(peak[x]*10);
+        PiezoEffect.interval(peak[x]*6);
         //starts the piezo decay timer and the timer to start ambient after no action
         PiezoEffect.start();
         ambientLEDs.start(); 
@@ -167,12 +168,23 @@ while (usbMIDI.read()) { } // ignore incoming messages??
       // Ignore Aftershock state: wait for things to be quiet again
       if (value > thresholdMin) {
         msec[x] = 0; // keep resetting timer if above threshold
+        Serial.println(peak[x]);
       } else if (msec[x] > 30) {
-        //Serial.println("begin state 0");
+        
+        Serial.println("begin state 0");
         usbMIDI.sendNoteOff(drumNotes[x], 0, channel);
         state[x] = 0; // go back to idle after 30 ms below threshold
       }
     }
+  }
+
+
+  // Get the currently touched pads
+  currtouched = cap.touched();
+  repeatTimer.update();
+  // timer is runnig as long as this is getting called.
+  checkElectrodes();
+  
   // key repeat timer
   repeatTimer.update();
 
@@ -184,14 +196,7 @@ while (usbMIDI.read()) { } // ignore incoming messages??
   FastLED.show(); 
   PiezoEffect.update();
 
-} 
 
-
-  // Get the currently touched pads
-  currtouched = cap.touched();
-  repeatTimer.update();
-  // timer is runnig as long as this is getting called.
-  checkElectrodes();
 }
 
 void checkElectrodes(){
@@ -262,6 +267,7 @@ void ledFrameLoop(){
   gHue++;
   if (trigger_leds == true) {
     bpm();
+    //gBrightness = PiezoEffect
     //pacifica_add_whitecaps();
     //Serial.println("leds triggered");
   }
@@ -270,7 +276,7 @@ void ledFrameLoop(){
     // Serial.println("ambient mode");
   }
   else {
-    fadeToBlackBy( leds, NUM_LEDS, 1);
+    //fadeToBlackBy( leds, NUM_LEDS, 10);
   }
   
 }
@@ -279,10 +285,14 @@ void bpm()
 {
   // colored stripes pulsing at a defined Beats-Per-Minute (BPM)
   uint8_t BeatsPerMinute = 18;
+  //uint8_t remainingPiezo = PiezoEffect.elapsed();
+  //uint8_t bri = map(remainingPiezo, 0 , 255,0,10);
+  //gBright = bri
+  //Serial.println(bri);
   CRGBPalette16 palette = custom_palette_2;
   uint8_t beat = beatsin8( BeatsPerMinute, 18, 255,0,1);
   for( int i = 0; i < NUM_LEDS; i++) { //9948
-    leds[i] = ColorFromPalette(palette, gHue+(i*2), beat-gHue+(i*10));
+    leds[i] = ColorFromPalette(palette, gHue+(i*2), gBright + beat-gHue+(i*10));
   }
 }
 
