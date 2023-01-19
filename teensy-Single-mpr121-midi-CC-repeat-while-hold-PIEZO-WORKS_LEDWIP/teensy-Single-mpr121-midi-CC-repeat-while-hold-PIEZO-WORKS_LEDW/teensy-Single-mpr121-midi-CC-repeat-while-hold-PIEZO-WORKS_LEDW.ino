@@ -53,7 +53,7 @@ CRGB leds[NUM_LEDS];
 #define BRIGHTNESS          96
 #define FRAMES_PER_SECOND  120
 bool ambient_leds = true;
-bool trigger_leds = false;
+bool trigger_leds = true;
 
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns from Demo Reel 100 example
 uint8_t gBright = 0;
@@ -71,18 +71,19 @@ void triggerLoop(); // hoisted, defined below.
 void ledFrameLoop();
 void startAmbient();
 void stopPiezo();
+void DebugTest();
 
 #define LED_DECAY 5000 // leds will decay in brightness for 5 seconds before going dark
 #define AMBIENT_DELAY 5000 // leds will start doing something after the keys are untouched for this duration.
+#define DEBUG 1
 
-
-void triggerLoop(); // hoisted, defined below.
 // Ticker Library sets up timers and a function to call when the timer elapses
            //(functioncalled, timertime, number to repeat(0is forever, RESOLUTION)
 Ticker repeatTimer(triggerLoop, TRIGGER_DURATION, 0, MILLIS);
 Ticker ledFrameTimer(ledFrameLoop, 1000/FRAMES_PER_SECOND, 0, MILLIS);
 Ticker ambientLEDs(startAmbient, AMBIENT_DELAY, 0 , MILLIS);
 Ticker PiezoEffect(stopPiezo, 1000, 0 , MILLIS);
+Ticker DB(DebugTest, 10, MILLIS);
 // You can have up to 4 on one i2c bus but one is enough for testing!
 Adafruit_MPR121 cap = Adafruit_MPR121();
 // Keeps track of the last pins touched
@@ -95,6 +96,8 @@ const uint8_t controlNumA[] = {88,88,87,87,13,13,5,5,0,0,3,3}; //Change to #'s s
 const uint8_t controlValA[] = {127,0,127,0,127,0,127,0,127,0,127,0}; //Change to #'s stefan is using
 uint8_t ElectrodeTouched[numElectrodes] = {0,0,0,0,0,0,0,0,0,0,0,0};
 
+// set this string as we move through the program.
+String stateTest = "setup";
 
 void setup() {
   
@@ -125,6 +128,12 @@ void setup() {
   FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   // set master brightness control
   FastLED.setBrightness(BRIGHTNESS);
+  if (DEBUG == 1) {
+    Serial.println("Debug Mode");
+    Serial.println("Setup");
+  }
+  
+  
 }
 
 void loop() {
@@ -141,41 +150,50 @@ void loop() {
         state[x] = 1;
         peak[x] = value;
         msec[x] = 0;
+        if (DEBUG == 1) {stateTest = "drum 0";}
       }
     } else if (state[x] == 1) {
       // Peak Tracking state: for 10 ms, capture largest reading
       if (value > peak[x]) {
         peak[x] = value;
         Serial.println(peak[x]);
+        if (DEBUG == 1) {stateTest = "peak print";}
       }
       if (msec[x] >= 10) {
         Serial.print("peak = ");
         Serial.println(peak[x]);
         trigger_leds = true;
         ambient_leds = false;
+        if (DEBUG == 1) {stateTest = "drum effect";}
         PiezoEffect.interval(peak[x]*6);
         //starts the piezo decay timer and the timer to start ambient after no action
         PiezoEffect.start();
         ambientLEDs.start(); 
-        
+
+        if (DEBUG == 1) {stateTest = "premap";}
         //Serial.println("begin state 2");
         int velocity = map(peak[x], thresholdMin, 1023, 1, 127);
+        if (DEBUG == 1) {stateTest = "aftermap";}
         usbMIDI.sendNoteOn(drumNotes[x], velocity, channel);
+        if (DEBUG == 1) {stateTest = "sendmidi";}
         state[x] = 2;
         msec[x] = 0;
       }
     } else {
       // Ignore Aftershock state: wait for things to be quiet again
       if (value > thresholdMin) {
+        if (DEBUG == 1) {stateTest = "over thresh";}
         msec[x] = 0; // keep resetting timer if above threshold
         Serial.println(peak[x]);
       } else if (msec[x] > 30) {
         
         Serial.println("begin state 0");
+        if (DEBUG == 1) {stateTest = "state 0";}
         usbMIDI.sendNoteOff(drumNotes[x], 0, channel);
         state[x] = 0; // go back to idle after 30 ms below threshold
       }
     }
+    if (DEBUG == 1) {stateTest = "endloop";}
   }
 
 
@@ -193,9 +211,11 @@ void loop() {
 
   // turn on ambient LEDs timer
   ambientLEDs.update();
+  if (DEBUG == 1) {stateTest = "timer update";}
   FastLED.show(); 
   PiezoEffect.update();
-
+  static unsigned int loopcount=0;
+  Serial.printf("loop end %u\n", loopcount++); // does this print while frozen problem??
 
 }
 
@@ -292,7 +312,8 @@ void bpm()
   CRGBPalette16 palette = custom_palette_2;
   uint8_t beat = beatsin8( BeatsPerMinute, 18, 255,0,1);
   for( int i = 0; i < NUM_LEDS; i++) { //9948
-    leds[i] = ColorFromPalette(palette, gHue+(i*2), gBright + beat-gHue+(i*10));
+    leds[i] = ColorFromPalette(palette, gHue+(i*2), beat-gHue+(i*10));
+    Serial.println(beat-gHue+(i*10));
   }
 }
 
@@ -302,10 +323,14 @@ void rainbow()
   fill_rainbow( leds, NUM_LEDS, gHue, 7);
 }
 
+void DebugTest(){
+  Serial.println(stateTest);
+  }
+
 
 
 void triggerMidi(int i){
-   usbMIDI.sendControlChange(controlNumA[i], controlValA[i], channel); //(control#, controlval, channel)
+   usbMIDI.sendControlChange(controlNumA[i], controlValA[i], channel); //(control#, controlval, channel);
    Serial.print("triggered midi on: ");
    Serial.println(i);
 }
