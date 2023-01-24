@@ -15,10 +15,9 @@ Written by Limor Fried/Ladyada for Adafruit Industries.
 BSD license, all text above must be included in any redistribution
 **********************************************************/
 
-//sketch in progress.  trying to read i2c from mpr121 and send midi message from teensy in response to which pin is touched. 
+//reads i2c from mpr121 and sends repeating CC midi message from teensy in response while pin is touched. 
 //important links: teensy wire library: https://www.pjrc.com/teensy/td_libs_Wire.html
 // teensy midi library: https://www.pjrc.com/teensy/td_midi.html
-//current issues: doesn't work once unplugged and plugged back in.  only works when connedted to the serial monitor
 
 #include <Wire.h>
 #include "Adafruit_MPR121.h"
@@ -38,7 +37,7 @@ void triggerLoop(); // hoisted, defined below.
 Ticker repeatTimer(triggerLoop, TRIGGER_DURATION, 0, MILLIS);
 // You can have up to 4 on one i2c bus but one is enough for testing!
 Adafruit_MPR121 capA = Adafruit_MPR121();
-Adafruit_MPR121 capB = Adafruit_MPR121();
+Adafruit_MPR121 capB = Adafruit_MPR121(); 
 
 // Keeps track of the last pins touched
 // so we know when buttons are 'released'
@@ -47,7 +46,7 @@ uint16_t currtouchedA = 0;
 uint16_t lasttouchedB = 0;
 uint16_t currtouchedB = 0;
 const uint8_t numElectrodes = 12; //added by drc
-const uint8_t notes[numElectrodes] = {36, 38, 40, 43, 45, 47, 48, 50, 52, 55, 57, 60}; //added by drc
+//const uint8_t notes[numElectrodes] = {36, 38, 40, 43, 45, 47, 48, 50, 52, 55, 57, 60}; //added by drc
 const uint8_t controlNumA[] = {88,88,87,87,13,13,5,5,0,0,3,3}; //Change to #'s stefan is using. 88, 87, 13, 5, 0, 3, 50 is mode shift
 const uint8_t controlNumB[] = {88,88,87,87,13,13,5,5,0,0,3,3}; //Change to #'s stefan is using. 88, 87, 13, 5, 0, 3, 50 is mode shift
 
@@ -78,9 +77,9 @@ void setup() {
     Serial.println("MPR121 0x5A not found, check wiring?");
     while (1);
   }
-    Serial.println("MPR121 0x5A found!");
+  Serial.println("MPR121 0x5A found!");
 
-    if (!capA.begin(0x5B)) {
+  if (!capB.begin(0x5B)) {
     Serial.println("MPR121 0x5B not found, check wiring?");
     while (1);
   }
@@ -106,39 +105,29 @@ void checkElectrodes(){
   for (uint8_t i=0; i<numElectrodes; i++) { //changed i<0 to i<numElectrodes
     // it if *is* touched and *wasnt* touched before, alert!
     if ((currtouchedA & _BV(i)) && !(lasttouchedA & _BV(i)) ) {
-
-
       digitalWrite (LED_BUILTIN, HIGH); //added by drc
-
       Serial.print(i); Serial.println(" touched of A");
       // set the array value to 1 on touch
       ElectrodeTouchedA[i] = 1;
     }
     // if it *was* touched and now *isnt*, alert! 
     if (!(currtouchedA & _BV(i)) && (lasttouchedA & _BV(i)) ) {
-
       digitalWrite (LED_BUILTIN, LOW);
       Serial.print(i); Serial.println(" released of A");
       // set it back to 0 on release
       ElectrodeTouchedA[i] = 0;   
     }
-  }
 
-//For mpr121 0x5B--------------------
-  for (uint8_t i=0; i<numElectrodes; i++) { //changed i<0 to i<numElectrodes
+    //For mpr121 0x5B--------------------
     // it if *is* touched and *wasnt* touched before, alert!
     if ((currtouchedB & _BV(i)) && !(lasttouchedB & _BV(i)) ) {
-
-
       digitalWrite (LED_BUILTIN, HIGH); //added by drc
-
       Serial.print(i); Serial.println(" touched of B");
       // set the array value to 1 on touch
       ElectrodeTouchedB[i] = 1;
     }
     // if it *was* touched and now *isnt*, alert! 
     if (!(currtouchedB & _BV(i)) && (lasttouchedB & _BV(i)) ) {
-
       digitalWrite (LED_BUILTIN, LOW);
       Serial.print(i); Serial.println(" released of B");
       // set it back to 0 on release
@@ -149,7 +138,7 @@ void checkElectrodes(){
   // reset our state
   lasttouchedA = currtouchedA;
   lasttouchedB = currtouchedB;
-
+  return; //Added back by DRC trying to debug??
 }
 
 void triggerLoop(){
@@ -164,7 +153,6 @@ void triggerLoop(){
   }
   //Serial.print(ElectrodeTouched[0]);
   //Serial.print("trigger Loop");
-
 }
 
 void triggerMidiA(int i){
@@ -177,12 +165,3 @@ void triggerMidiB(int i){
    Serial.print("triggered midi on: B ");
    Serial.println(i);
 }
-/* 
-void noteOn(uint8_t channel, uint8_t pitch, uint8_t velocity) {
-	usbMIDI.sendNoteOn(notes[numElectrodes], velocity, channel); //notes changed to [numElectrodes] by drc
-}
-
-void noteOff(uint8_t channel, uint8_t pitch, uint8_t velocity) {
-	usbMIDI.sendNoteOff(notes[numElectrodes], velocity, channel);
-}
-*/
