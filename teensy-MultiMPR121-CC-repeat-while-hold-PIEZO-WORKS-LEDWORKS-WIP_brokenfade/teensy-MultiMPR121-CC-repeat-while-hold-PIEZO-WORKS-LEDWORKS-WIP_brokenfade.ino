@@ -72,11 +72,11 @@ const int aftershockMillis = 60; // time of aftershocks & vibration
 #define NUM_LEDS    300
 CRGB leds[NUM_LEDS];
 #define BRIGHTNESS          96
-#define FRAMES_PER_SECOND  120
-#define LED_DECAY 5000 // leds will decay in brightness for 5 seconds before going dark
+#define FRAMES_PER_SECOND  30
+//#define LED_DECAY 1000 // leds will decay in brightness for 5 seconds before going dark
 #define AMBIENT_DELAY 5000 // leds will start doing something after the keys are untouched for this duration.
 #define BRIGHT_RAMP 1000
-
+//fade out speed is controlled by fadeToBlackBy 
 bool ambient_leds = true;
 bool ambient_fade = true;
 bool trigger_leds = false;
@@ -88,8 +88,8 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns from Dem
 
  CRGBPalette16 custom_palette_2 = 
     { 
-      CRGB::Black, CRGB::Maroon, CRGB::DarkBlue, CRGB::Blue, CRGB::Orange, CRGB::Maroon, CRGB::Maroon, CRGB::Maroon,
-      CRGB::Maroon, CRGB::Maroon, CRGB::Maroon, CRGB::Maroon, CRGB::Maroon, CRGB::Maroon ,CRGB::Maroon, CRGB::Maroon
+      CRGB::Red, CRGB::DarkOrchid, CRGB::Purple, CRGB::DarkViolet, CRGB::DarkViolet, CRGB::Maroon, CRGB::Maroon, CRGB::Maroon,
+      CRGB::Maroon, CRGB::Red, CRGB::Red, CRGB::Maroon, CRGB::Purple, CRGB::DarkOrchid ,CRGB::DarkOrchid, CRGB::Red
     };
 
 void triggerLoop(); // hoisted, defined below.
@@ -359,7 +359,7 @@ void ledFrameLoop(){
     // Serial.println("ambient mode");
   }
   else {
-    fadeToBlackBy( leds, NUM_LEDS, 1);
+    fadeToBlackBy( leds, NUM_LEDS, 30);
   }
   
 }
