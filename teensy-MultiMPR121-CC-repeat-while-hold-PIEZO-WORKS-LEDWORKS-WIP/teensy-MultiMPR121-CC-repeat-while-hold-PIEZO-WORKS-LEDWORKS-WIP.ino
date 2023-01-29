@@ -90,6 +90,15 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns from Dem
       CRGB::Maroon, CRGB::Maroon, CRGB::Maroon, CRGB::Maroon, CRGB::Maroon, CRGB::Maroon ,CRGB::Maroon, CRGB::Maroon
     };
 
+     CRGBPalette16 black_palette = 
+    { 
+      CRGB::Black,CRGB::Black, CRGB::Black, CRGB::Black, CRGB::Black, CRGB::Black, CRGB::Black, CRGB::Black, 
+      CRGB::Black,CRGB::Black, CRGB::Black, CRGB::Black, CRGB::Black, CRGB::Black, CRGB::Black, CRGB::Black
+    };
+
+  CRGBPalette16 currentPalette( black_palette);
+  CRGBPalette16 targetPalette( custom_palette_2 );
+
 void triggerLoop(); // hoisted, defined below.
 void ledFrameLoop();
 void startAmbient();
@@ -255,7 +264,10 @@ void checkElectrodes(){
 
       trigger_leds = false;
       ambient_leds = false;
-      ambientLEDs.start();  
+      ambientLEDs.start();
+      //start ambient w black
+      CRGBPalette16 currentPalette( black_palette);
+
     }
 
     //For mpr121 0x5B--------------------
@@ -280,6 +292,9 @@ void checkElectrodes(){
       trigger_leds = false;
       ambient_leds = false;
       ambientLEDs.start();  
+      //start ambient w black
+      CRGBPalette16 currentPalette( black_palette);
+
     }
 
   }
@@ -329,7 +344,8 @@ void ledFrameLoop(){
     //Serial.println("leds triggered");
   }
   else if (ambient_leds == true && trigger_leds == false) {
-    fill_palette(leds, NUM_LEDS, gHue, 255, OceanColors_p,50, LINEARBLEND );
+    nblendPaletteTowardPalette(currentPalette, targetPalette, 10);
+    fill_palette(leds, NUM_LEDS, gHue, 255, currentPalette,50, LINEARBLEND );
     // Serial.println("ambient mode");
   }
   else {
