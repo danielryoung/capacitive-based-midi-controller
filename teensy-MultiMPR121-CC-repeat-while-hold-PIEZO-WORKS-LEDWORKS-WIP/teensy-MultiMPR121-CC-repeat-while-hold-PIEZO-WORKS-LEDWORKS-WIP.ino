@@ -97,7 +97,7 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns from Dem
     };
 
   CRGBPalette16 currentPalette( black_palette);
-  CRGBPalette16 targetPalette( custom_palette_2 );
+  CRGBPalette16 targetPalette( OceanColors_p );
 
 void triggerLoop(); // hoisted, defined below.
 void ledFrameLoop();
@@ -138,7 +138,7 @@ const uint8_t notes[numElectrodes] = {36, 38, 40, 43, 45, 47, 48, 50, 52, 55, 57
 void setup() {
   
   Wire.begin(0x5A); //added by drc
-  Wire.begin(0x5B); //added by drc
+  //Wire.begin(0x5B); //added by drc
 
   Serial.begin(9600);
   pinMode(LED_BUILTIN, OUTPUT); //added by drc
@@ -152,10 +152,10 @@ void setup() {
     while (1); 
   }
   Serial.println("MPR121 found!");
-  if (!capB.begin(0x5B)) {
-    Serial.println("MPR121 0x5B not found, check wiring?");
-    while (1);
-  }
+  //if (!capB.begin(0x5B)) {
+   // Serial.println("MPR121 0x5B not found, check wiring?");
+    //while (1);
+  //}
   Serial.println("MPR121 0x5B found!");
   
 repeatTimer.start();
@@ -234,7 +234,7 @@ while (usbMIDI.read()) { } // ignore incoming messages??
 
   // Get the currently touched pads
   currtouchedA = capA.touched();
-  currtouchedB = capB.touched();
+  //currtouchedB = capB.touched();
 
   repeatTimer.update();
   // timer is runnig as long as this is getting called.
@@ -254,6 +254,8 @@ void checkElectrodes(){
       // on touch, turn off ambient leds and turn on trigger_leds
       ambient_leds = false;
       trigger_leds = true;
+      // assigns palette back to black for fade in later.
+      currentPalette = black_palette;
     }
     // if it *was* touched and now *isnt*, alert! 
     if (!(currtouchedA & _BV(i)) && (lasttouchedA & _BV(i)) ) {
@@ -266,12 +268,13 @@ void checkElectrodes(){
       ambient_leds = false;
       ambientLEDs.start();
       //start ambient w black
-      CRGBPalette16 currentPalette( black_palette);
+      
 
     }
 
     //For mpr121 0x5B--------------------
     // it if *is* touched and *wasnt* touched before, alert!
+    /*
     if ((currtouchedB & _BV(i)) && !(lasttouchedB & _BV(i)) ) {
       digitalWrite (LED_BUILTIN, HIGH); //added by drc
       Serial.print(i); Serial.println(" touched of B");
@@ -296,12 +299,13 @@ void checkElectrodes(){
       CRGBPalette16 currentPalette( black_palette);
 
     }
+    */
 
   }
 
   // reset our state
   lasttouchedA = currtouchedA;
-  lasttouchedB = currtouchedB;
+ // lasttouchedB = currtouchedB;
   return; //Added back by DRC trying to debug??}
 }
 
@@ -344,9 +348,23 @@ void ledFrameLoop(){
     //Serial.println("leds triggered");
   }
   else if (ambient_leds == true && trigger_leds == false) {
-    nblendPaletteTowardPalette(currentPalette, targetPalette, 10);
-    fill_palette(leds, NUM_LEDS, gHue, 255, currentPalette,50, LINEARBLEND );
-    // Serial.println("ambient mode");
+    
+    // added this modulo to slow how much the blend gets called for a slower fade in.  
+    if (gHue % 4 == 0 ){
+
+      // this blends the just blacked out palette to target which is Ocean. 
+      //12 is default. play with this one 
+      nblendPaletteTowardPalette(currentPalette, targetPalette, 12);
+      // form docs: a visually smoother transition: in the middle of the cross-fade your current palette will actually contain some colors from the old palette, a few blended colors, and some colors from the new palette.
+      //The maximum number of possible palette changes per call is 48 (sixteen color entries time three channels each).//
+      //The default 'maximim number of changes' here is 12, meaning that only approximately a quarter of the palette entries will be changed per call.
+
+
+      //Serial.println("ambient mode");
+    }
+    // also added this sin8 that I think slows it a bit and makes it bounce, remove sin38 and it should not bounce?
+    fill_palette(leds, NUM_LEDS, sin8(gHue) /2, 25, currentPalette,50, LINEARBLEND );
+   
   }
   else {
     fadeToBlackBy( leds, NUM_LEDS, 1);
